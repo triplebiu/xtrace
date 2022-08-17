@@ -2,7 +2,6 @@ use std::path::{Path, PathBuf};
 use tracing_subscriber::{prelude::*, layer::SubscriberExt, util::SubscriberInitExt};
 use clap::{Args, Parser, Subcommand};
 use utmp;
-use utmp_rs::UtmpEntry;
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
@@ -40,9 +39,6 @@ struct Cli {
 
 
 fn main() {
-
-    utmp::libtest::libtest000();
-
     tracing_subscriber::registry()
         // .with(tracing_subscriber::EnvFilter::new(
         //     std::env::var("RUST_LOG").unwrap_or_else(|_| "XTRACE_LOG=debug".into()),
@@ -66,10 +62,17 @@ fn main() {
     }
     tracing::info!("exists files: {:?}",existsfile);
 
-    // list match records in the target file(s).
+    const UTMPDATA: &[u8] = include_bytes!("../files4test/utmp");
     if cli.delete == false {
-        let entries = utmp_rs::parse_from_path("../files4test/utmp").ok();
-        println!("{:#?}",entries);
+
+        let (_, res2) = utmp::take_all_records(UTMPDATA).ok().unwrap();
+
+        for (_index, utmp_item) in res2.iter().enumerate() {
+            println!("ut_type: {:}\tut_host: {:40}\tut_time_sec: {}",
+                     utmp_item.ut_type,
+                     utmp::ulity::extract_string(&utmp_item.ut_host),
+                     utmp_item.ut_time_sec);
+        }
     }
 
 }

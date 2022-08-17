@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 /// Convert str to bytes.
 pub fn hex_to_bytes(s: &str) -> Option<Vec<u8>> {
     if s.len() % 2 == 0 && s.len() >= 2 {
@@ -18,7 +19,7 @@ pub fn hex_to_bytes(s: &str) -> Option<Vec<u8>> {
 }
 
 /// Return the type of variables.
-pub fn TypeOf<T>(_: &T) -> String{
+pub fn type_of<T>(_: &T) -> String{
     format!("{}", std::any::type_name::<T>())
 }
 
