@@ -2,7 +2,7 @@ use nom::IResult;
 // use nom::error::Error;
 use nom::bytes::complete::{take};
 use nom::combinator::map;
-use nom::multi::{count, many0};
+use nom::multi::{count, many0, many_m_n};
 use nom::number::complete::i32;
 use crate::utmp::Utmp;
 
@@ -39,9 +39,14 @@ pub const SHUTDOWN_TIME: i32 = 11;
 pub const UT_LINESIZE: usize = 32;
 pub const UT_NAMESIZE: usize = 32;
 pub const UT_HOSTSIZE: usize = 256;
+pub const UT_RECORDSIZE: usize = 384;
 
 pub fn take_all_records(i: &[u8]) -> IResult<&[u8], Vec<Utmp>> {
     many0(take_one_record)(i)
+}
+
+pub fn take_n_records(i: &[u8], n: u32) -> IResult<&[u8], Vec<Utmp>> {
+    many_m_n(0,n as usize,take_one_record)(i)
 }
 
 pub fn take_one_record(i: &[u8]) -> IResult<&[u8], Utmp> {
@@ -129,7 +134,7 @@ mod tests {
         for (index, utmp_item) in res2.iter().enumerate() {
             println!("{:03}: {:?}",index, utmp_item);
             match index {
-                // 0 => assert_eq!(utmp_item.as_bytes(),utmp0.as_ref().unwrap().as_slice()),
+                0 => assert_eq!(&utmp_item.as_bytes_vec(),utmp0.as_ref().unwrap()),
                 // 1 => assert_eq!(utmp_item.as_bytes(),utmp1.as_ref().unwrap().as_slice()),
                 // 2 => assert_eq!(utmp_item.as_bytes(),utmp2.as_ref().unwrap().as_slice()),
                 // 3 => assert_eq!(utmp_item.as_bytes(),utmp3.as_ref().unwrap().as_slice()),

@@ -76,7 +76,6 @@ impl fmt::Debug for Utmp {
     }
 }
 
-// todo: 实现Utmp转换为byte数组，通过覆盖式写入来实现文件修改。
 impl Utmp {
     pub fn as_bytes(&self) -> [u8;384] {
         // (*self).as_bytes()
@@ -121,6 +120,26 @@ impl Utmp {
         outvec.extend_from_slice(&[0u8; 20]);
         // println!("outvec lenght: {}",outvec.len());
         outvec.try_into().unwrap()
+    }
+
+    pub fn as_bytes_vec(&self) -> Vec<u8> {
+        let mut outvec = Vec::new();
+        outvec.extend_from_slice(&self.ut_type.to_ne_bytes());
+        outvec.extend_from_slice(&self.ut_pid.to_ne_bytes());
+        outvec.extend_from_slice(&self.ut_line.as_bytes());
+        outvec.extend_from_slice(&self.ut_id.as_bytes());
+        outvec.extend_from_slice(&self.ut_user.as_bytes());
+        outvec.extend_from_slice(&self.ut_host.as_bytes());
+        outvec.extend_from_slice(&self.ut_termination.to_ne_bytes());
+        outvec.extend_from_slice(&self.ut_exit.to_ne_bytes());
+        outvec.extend_from_slice(&self.ut_session.to_ne_bytes());
+        outvec.extend_from_slice(&self.ut_time_sec.to_ne_bytes());
+        outvec.extend_from_slice(&self.ut_time_usec.to_ne_bytes());
+        for i in 0..self.ut_addr_v6.len() {
+            outvec.extend_from_slice(&self.ut_addr_v6[i].to_ne_bytes());
+        }
+        outvec.extend_from_slice(&[0u8; 20]);
+        outvec
     }
 }
 
