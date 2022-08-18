@@ -135,6 +135,7 @@ impl TryFrom<Utmp> for UtmpEntry {
             if from.ut_addr_v6[1..4] != [0,0,0] {
                 Some(IpAddr::V6(Ipv6Addr::from(tmpipv6u8)))
             } else if from.ut_addr_v6[0] != 0 {
+                // tracing::debug!("from.ut_addr_v6[0] {:?}", from.ut_addr_v6[0]);
                 Some(IpAddr::V4(Ipv4Addr::from(from.ut_addr_v6[0])))
             }
             else {

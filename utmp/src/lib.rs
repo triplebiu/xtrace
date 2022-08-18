@@ -1,10 +1,11 @@
-use nom::IResult;
+use nom::{AsBytes, IResult};
 // use nom::error::Error;
 use nom::bytes::complete::{take};
 use nom::combinator::map;
 use nom::multi::{count, many0, many_m_n};
 use nom::number::complete::i32;
 use crate::utmp::Utmp;
+use std::io::Write;
 
 
 pub mod ulity;
@@ -76,7 +77,8 @@ pub fn take_one_record_with_original_data(i: &[u8]) -> IResult<&[u8], (Vec<u8>, 
     let (i,ut_time_sec) = map(take(4u32), |s: &[u8]| u32::from_ne_bytes(s.try_into().unwrap_or([0u8;4])))(i)?;
     let (i,ut_time_usec) = map(take(4u32), |s: &[u8]| u32::from_ne_bytes(s.try_into().unwrap_or([0u8;4])))(i)?;
     // let (i,ut_addr_v6) = count(take(4u32),4)(i)?;
-    let (i,ut_addr_v6) = count(map(take(4u32), |s: &[u8]| u32::from_ne_bytes(s.try_into().unwrap_or([0u8;4]))),4)(i)?;
+    // 刻意修改为大端取数： u32::from_be_bytes()，以纠正IP地址的异常。
+    let (i,ut_addr_v6) = count(map(take(4u32), |s: &[u8]| u32::from_be_bytes(s.try_into().unwrap_or([0u8;4]))),4)(i)?;
     // let (i,__unused) = map(take(20u32),|s: &[u8]| ulity::extract_string(s))(i)?;
     let (i,__unused) = take(20u32)(i)?;
 
@@ -117,7 +119,14 @@ pub fn take_one_record(i: &[u8]) -> IResult<&[u8], Utmp> {
     let (i,ut_time_sec) = map(take(4u32), |s: &[u8]| u32::from_ne_bytes(s.try_into().unwrap_or([0u8;4])))(i)?;
     let (i,ut_time_usec) = map(take(4u32), |s: &[u8]| u32::from_ne_bytes(s.try_into().unwrap_or([0u8;4])))(i)?;
     // let (i,ut_addr_v6) = count(take(4u32),4)(i)?;
-    let (i,ut_addr_v6) = count(map(take(4u32), |s: &[u8]| u32::from_ne_bytes(s.try_into().unwrap_or([0u8;4]))),4)(i)?;
+    // let (i,ut_addr_v6) = count(map(take(4u32), |s: &[u8]| u32::from_ne_bytes(s.try_into().unwrap_or([0u8;4]))),4)(i)?;
+    let (i,ut_addr_v6) = count(map(take(4u32), |s: &[u8]| {
+        // println!("bytes: {:?}",s.try_into().unwrap_or([0u8;4]));
+        // std::io::stdout().flush().unwrap();
+        let mut ss:Vec<u8> = s.try_into().unwrap();
+        ss.reverse();
+        u32::from_le_bytes(ss.try_into().unwrap_or([0u8;4]))
+    }),4)(i)?;
     // let (i,__unused) = map(take(20u32),|s: &[u8]| ulity::extract_string(s))(i)?;
     let (i,__unused) = take(20u32)(i)?;
 

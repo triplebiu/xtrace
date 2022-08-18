@@ -25,9 +25,9 @@ struct Cli {
     PathBuf::from("/run/utmp"),
     PathBuf::from("/var/log/wtmp"),
     PathBuf::from("/var/log/btmp"),
-    PathBuf::from("files4test/utmp"),
-    PathBuf::from("files4test/wtmp"),
-    PathBuf::from("files4test/btmp"),
+    // PathBuf::from("files4test/utmp"),
+    // PathBuf::from("files4test/wtmp"),
+    // PathBuf::from("files4test/btmp"),
     ]
     )]
     targetfile: Vec<PathBuf>,
@@ -98,7 +98,7 @@ fn main() {
         if target_file_lenght % (UT_RECORDSIZE as u64) > 0 {
             println!("Caution! This file may not be a valid utmp file due to inappropriate file size.");
         } else {
-            println!("Estimated amount of records in the file (by file size): {:5}", target_file_lenght / (UT_RECORDSIZE as u64));
+            println!("Estimated amount of records in the file (by file size): {:5}\nThe Matched Records: ", target_file_lenght / (UT_RECORDSIZE as u64));
         }
 
         let f = File::open(&target_file).unwrap();
@@ -173,47 +173,39 @@ fn main() {
                 .to_string()
             );
             if cli.delete {
-                print!("Are you sure to remove above entries from the file? (Yes/No) ");
-                io::stdout().flush().unwrap();
+                // print!("Are you sure to remove above entries from the file? (Yes/No) ");
+                // io::stdout().flush().unwrap();
                 // println!("Original file size: {} bytes.\tNew file size: {} bytes.", utmp_data.len(), save_back_data.len());
-                let stdin = io::stdin();
-                for line in stdin.lock().lines() {
-                    match line {
-                        Err(_) => break,    // with ^Z
-                        Ok(s) => if s.to_lowercase().trim_end().eq("yes") || s.to_lowercase().trim_end().eq("y") {
-                            // println!("override the original file.....");
-                            // do override.....
-                            // match write_to_file(target_file, save_back_data) {
-                            // match fs::write(target_file, save_back_data) {
-                            //     Ok(_) => println!("Done."),
-                            //     Err(e) => tracing::error!("Something Wrong. | {}",e.to_string()),
-                            // }
-                            // for (true_mark, utmp_data) in utmp_data_with_remove_marks {
-                            //     if true_mark {
-                            //         match fs::write(&target_file, utmp_data) {
-                            //             Ok(_) => println!("Done."),
-                            //             Err(e) => tracing::error!("Something Wrong. | {}",e.to_string()),
-                            //         }
-                            //     }
-                            // }
-                            // utmp_data_with_remove_marks.into_iter().map(|(mark, data)| if mark {data} else {Vec::new()}).flatten().collect::<Vec<_>>();
-                            match fs::write(&target_file,
-                                            utmp_data_with_remove_marks.into_iter().
-                                                map(|(mark, data)| if mark { data } else { Vec::new() }).flatten()
-                                                .collect::<Vec<_>>(),
-                            ) {
-                                Ok(_) => println!("Done."),
-                                Err(e) => tracing::error!("Something Wrong. | {}",e.to_string()),
-                            }
-                            break;
-                        } else if s.to_lowercase().trim_end().eq("no") || s.to_lowercase().trim_end().eq("n") {
-                            break;
-                        } else {
-                            print!("Are you sure to remove above entries from the file? (Yes/No) ");
-                            io::stdout().flush().unwrap();
-                        }
-                    }
+                match fs::write(&target_file,
+                                utmp_data_with_remove_marks.into_iter().
+                                    map(|(mark, data)| if mark { data } else { Vec::new() }).flatten()
+                                    .collect::<Vec<_>>(),
+                ) {
+                    Ok(_) => println!("Complete. The above records have been deleted."),
+                    Err(e) => tracing::error!("Something Wrong. | {}",e.to_string()),
                 }
+                // let stdin = io::stdin();
+                // for line in stdin.lock().lines() {
+                //     match line {
+                //         Err(_) => break,    // with ^Z
+                //         Ok(s) => if s.to_lowercase().trim_end().eq("yes") || s.to_lowercase().trim_end().eq("y") {
+                //             match fs::write(&target_file,
+                //                             utmp_data_with_remove_marks.into_iter().
+                //                                 map(|(mark, data)| if mark { data } else { Vec::new() }).flatten()
+                //                                 .collect::<Vec<_>>(),
+                //             ) {
+                //                 Ok(_) => println!("Done."),
+                //                 Err(e) => tracing::error!("Something Wrong. | {}",e.to_string()),
+                //             }
+                //             break;
+                //         } else if s.to_lowercase().trim_end().eq("no") || s.to_lowercase().trim_end().eq("n") {
+                //             break;
+                //         } else {
+                //             print!("Are you sure to remove above entries from the file? (Yes/No) ");
+                //             io::stdout().flush().unwrap();
+                //         }
+                //     }
+                // }
             }
         } else {
             println!("---------  NO MATCHED RECORDS FOUND  ----------");
