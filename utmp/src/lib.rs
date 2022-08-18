@@ -5,8 +5,6 @@ use nom::combinator::map;
 use nom::multi::{count, many0, many_m_n};
 use nom::number::complete::i32;
 use crate::utmp::Utmp;
-use std::io::Write;
-
 
 pub mod ulity;
 pub mod utmp;

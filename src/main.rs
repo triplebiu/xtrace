@@ -101,7 +101,15 @@ fn main() {
             println!("Estimated amount of records in the file (by file size): {:5}\nThe Matched Records: ", target_file_lenght / (UT_RECORDSIZE as u64));
         }
 
-        let f = File::open(&target_file).unwrap();
+        // let f = File::open(&target_file).unwrap();
+        let f;
+        match File::open(&target_file) {
+            Ok(fhandle) => f = fhandle,
+            Err(e) => {
+                tracing::error!("Write File FAILED. | {}",e.to_string());
+                continue;
+            },
+        }
         let mut reader = BufReader::new(f);
         let mut utmp_data = Vec::new();
         reader.read_to_end(&mut utmp_data).unwrap();
@@ -182,7 +190,10 @@ fn main() {
                                     .collect::<Vec<_>>(),
                 ) {
                     Ok(_) => println!("Complete. The above records have been deleted."),
-                    Err(e) => tracing::error!("Something Wrong. | {}",e.to_string()),
+                    Err(e) => {
+                        tracing::error!("Write File FAILED. | {}",e.to_string());
+                        continue;
+                    },
                 }
                 // let stdin = io::stdin();
                 // for line in stdin.lock().lines() {
@@ -240,16 +251,17 @@ fn verify_cli() {
 fn list_utmp_entries() {
     const UTMPDATA: &[u8] = include_bytes!("../files4test/utmp");
 
+    let mut utmpentries: Vec<UtmpEntry> = Vec::new();
     let (_, res2) = utmp::take_all_records(UTMPDATA).ok().unwrap();
 
-    let mut utmpentries: Vec<UtmpEntry> = Vec::new();
-    for (_index, utmp_item) in res2.iter().enumerate() {
-        // println!("ut_type: {:}\tut_host: {:40}\tut_time_sec: {}",
-        //          utmp_item.ut_type,
-        //          utmp::ulity::extract_string(&utmp_item.ut_host),
-        //          utmp_item.ut_time_sec);
-        utmpentries.push(utmp_item.try_into().unwrap());
-        // println!("{:?}", utmp_item);
+    for (index, utmp_item) in res2.into_iter().enumerate(){
+        let mut utmpentries: Vec<UtmpEntry> = Vec::new();
+        match UtmpEntry::try_from(utmp_item) {
+            Ok(utmp_entry) => { utmpentries.push(utmp_entry) },
+            Err(e) => {
+                tracing::error!("it sames not well-format utmp data.");
+            }
+        }
     }
     // println!("{}",Table::new(utmpentries).to_string());
     println!("{}", Table::builder(utmpentries)
@@ -277,4 +289,11 @@ fn check_files() {
     println!("utmp_data: {:?}", utmp_data);
     let (_, res2) = utmp::take_all_records(&utmp_data).ok().unwrap();
     eprintln!("record amount: {}", res2.len())
+}
+
+#[test]
+fn check_file_permission() {
+    let mut f = File::open("/var/run/utmpx").unwrap();
+    let metadata = f.metadata().unwrap();
+    println!("{:#?}",metadata);
 }

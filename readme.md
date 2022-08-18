@@ -57,6 +57,11 @@ OPTIONS:
 
 后续看情况。。。。
 
+## Change Log
+- Version 0.1.2 (2022.08.18)
+    
+    提示文件没有权限。。。
+
 ## 参考
 ### Linux日志文件
 > https://www.eurovps.com/blog/important-linux-log-files-you-must-be-monitoring/
