@@ -5,7 +5,9 @@ use std::convert::TryInto;
 use super::ulity;
 
 
-/// 参考来自：https://github.com/libyal/dtformats/blob/main/documentation/Utmp%20login%20records%20format.asciidoc
+
+// 参考来自：https://github.com/libyal/dtformats/blob/main/documentation/Utmp%20login%20records%20format.asciidoc
+/// Linux utmp login record format.
 #[repr(C)]
 #[derive(Clone)]
 pub struct Utmp {

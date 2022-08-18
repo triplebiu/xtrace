@@ -6,6 +6,7 @@ use nom::multi::{count, many0, many_m_n};
 use nom::number::complete::i32;
 use crate::utmp::Utmp;
 
+
 pub mod ulity;
 pub mod utmp;
 
@@ -45,10 +46,59 @@ pub fn take_all_records(i: &[u8]) -> IResult<&[u8], Vec<Utmp>> {
     many0(take_one_record)(i)
 }
 
-pub fn take_n_records(i: &[u8], n: u32) -> IResult<&[u8], Vec<Utmp>> {
-    many_m_n(0,n as usize,take_one_record)(i)
+pub fn take_all_records_with_original_data(i: &[u8]) -> IResult<&[u8], Vec<(Vec<u8>, Utmp)>> {
+    many0(take_one_record_with_original_data)(i)
 }
 
+// pub fn take_n_records(i: &[u8], n: u32) -> IResult<&[u8], Vec<Utmp>> {
+//     many_m_n(0,n as usize,take_one_record)(i)
+// }
+
+pub fn take_one_record_with_original_data(i: &[u8]) -> IResult<&[u8], (Vec<u8>, Utmp)> {
+    let data:Vec<u8> = if i.len() >= UT_RECORDSIZE {
+         Vec::from(&i[..UT_RECORDSIZE])
+    } else {Vec::from(&i[..]) };
+    // let data: Vec<u8> = Vec::from([0u8;384]);
+    let (i,ut_type) = take(4u32)(i)?;
+    let (i,ut_pid) = take(4u32)(i)?;
+    // let (i,ut_line) = map(take(32u32),|s: &[u8]| ulity::extract_string(s))(i)?;
+    let (i,ut_line) = take(32u32)(i)?;
+    // let (i,ut_id) = map(take(4u32),|s: &[u8]| ulity::extract_string(s))(i)?;
+    let (i,ut_id) = take(4u32)(i)?;
+    // let (i,ut_user) = map(take(32u32),|s: &[u8]| ulity::extract_string(s))(i)?;
+    let (i,ut_user) = take(32u32)(i)?;
+    // let (i,ut_host) = map(take(256u32),|s: &[u8]| ulity::extract_string(s))(i)?;
+    let (i,ut_host) = take(256u32)(i)?;
+    let (i,ut_termination) = map(take(2u32), |s: &[u8]| i16::from_ne_bytes(s.try_into().unwrap_or([0u8;2])))(i)?;
+    let (i,ut_exit) = map(take(2u32), |s: &[u8]| i16::from_ne_bytes(s.try_into().unwrap_or([0u8;2])))(i)?;
+    // let (i,ut_session) = map(take(4u32), |s: &[u8]| i32::from_ne_bytes(s.try_into().unwrap_or([0u8;4])))(i)?;
+    let (i,ut_session) = i32(nom::number::Endianness::Native)(i)?;
+    let (i,ut_time_sec) = map(take(4u32), |s: &[u8]| u32::from_ne_bytes(s.try_into().unwrap_or([0u8;4])))(i)?;
+    let (i,ut_time_usec) = map(take(4u32), |s: &[u8]| u32::from_ne_bytes(s.try_into().unwrap_or([0u8;4])))(i)?;
+    // let (i,ut_addr_v6) = count(take(4u32),4)(i)?;
+    let (i,ut_addr_v6) = count(map(take(4u32), |s: &[u8]| u32::from_ne_bytes(s.try_into().unwrap_or([0u8;4]))),4)(i)?;
+    // let (i,__unused) = map(take(20u32),|s: &[u8]| ulity::extract_string(s))(i)?;
+    let (i,__unused) = take(20u32)(i)?;
+
+    Ok((i, (data,Utmp{
+        ut_type: i32::from_ne_bytes(ut_type.try_into().unwrap_or([0u8;4])),
+        // ut_type: i32::from_ne_bytes([2, 0, 0, 0]),
+        ut_pid: i32::from_ne_bytes(ut_pid.try_into().unwrap_or([0u8;4])),
+        // ut_line: [0; 32],
+        ut_line: ut_line.try_into().unwrap(),
+        ut_id: ut_id.try_into().unwrap(),
+        ut_user: ut_user.try_into().unwrap(),
+        ut_host: ut_host.try_into().unwrap(),
+        ut_termination: ut_termination,
+        ut_exit: ut_exit,
+        ut_session: ut_session,
+        ut_time_sec: ut_time_sec,
+        ut_time_usec: ut_time_usec,
+        // ut_addr_v4: ut_addr_v6[0].clone(),
+        ut_addr_v6: ut_addr_v6.try_into().unwrap(),
+        __unused: __unused.try_into().unwrap(),
+    })))
+}
 pub fn take_one_record(i: &[u8]) -> IResult<&[u8], Utmp> {
     let (i,ut_type) = take(4u32)(i)?;
     let (i,ut_pid) = take(4u32)(i)?;

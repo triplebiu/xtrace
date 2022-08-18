@@ -1,10 +1,12 @@
 mod entry;
+use chrono::prelude::*;
 
 use std::error::Error;
 use std::{fs, io};
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
+use std::collections::VecDeque;
 use tracing_subscriber::{prelude::*, layer::SubscriberExt, util::SubscriberInitExt};
 use clap::{Args, Parser, Subcommand};
 use tracing_subscriber::filter::LevelFilter;
@@ -23,9 +25,9 @@ struct Cli {
     PathBuf::from("/run/utmp"),
     PathBuf::from("/var/log/wtmp"),
     PathBuf::from("/var/log/btmp"),
-    // PathBuf::from("files4test/utmp"),
-    // PathBuf::from("files4test/wtmp"),
-    // PathBuf::from("files4test/btmp"),
+    PathBuf::from("files4test/utmp"),
+    PathBuf::from("files4test/wtmp"),
+    PathBuf::from("files4test/btmp"),
     ]
     )]
     targetfile: Vec<PathBuf>,
@@ -37,7 +39,9 @@ struct Cli {
     condition: Option<Vec<String>>,
 
     /// Specify the record count to aim in the target file.
-    #[clap(short = 'c', value_name = "number", default_value_t = 5, value_parser = clap::value_parser ! (u32).range(1..))]
+    ///
+    /// if set 0, it means all records.
+    #[clap(short = 'c', value_name = "number", default_value_t = 5)]
     count: u32,
 
     /// DELETE the matched records in the target file(s).
@@ -75,7 +79,10 @@ fn main() {
         tracing::error!("The target file(s) no exists.   Quiting!");
         return;
     }
-    println!("Target Files: {:?}\nFilter Conditions: {:?}\nMax Count: {}",existsfile,&cli.condition.clone().unwrap_or(Vec::new()), cli.count);
+    println!("Target Files: {:?}\nFilter Conditions: {:?}\nMax Count: {}"
+        ,existsfile
+        ,&cli.condition.clone().unwrap_or(Vec::new())
+        , if cli.count ==0 { "All".to_string()} else { cli.count.to_string()});
 
     // 遍历目标文件
     for target_file in existsfile {
@@ -89,7 +96,7 @@ fn main() {
             tracing::warn!("Caution! The target file is a bit large. ({} bytes)", target_file_lenght);
         }
         if target_file_lenght % (UT_RECORDSIZE as u64) > 0 {
-            println!("This file may not be a valid utmp file due to inappropriate file size.");
+            println!("Caution! This file may not be a valid utmp file due to inappropriate file size.");
         } else {
             println!("Estimated amount of records in the file (by file size): {:5}", target_file_lenght / (UT_RECORDSIZE as u64));
         }
@@ -100,40 +107,52 @@ fn main() {
         reader.read_to_end(&mut utmp_data).unwrap();
 
         // println!("utmp_data: {:?}",utmp_data);
-        let (_, utmp_items) = utmp::take_all_records(&utmp_data).ok().unwrap();
+        // let (_, utmp_items) = utmp::take_all_records(&utmp_data).ok().unwrap();
+        let (_, utmp_items_with_original_data) = utmp::take_all_records_with_original_data(&utmp_data).ok().unwrap();
 
-        let mut utmpentries: Vec<UtmpEntry> = Vec::new();
-        let mut save_back_data: Vec<u8> = Vec::new();
-        for (_index, utmp_item) in utmp_items.iter().enumerate() {
+
+        // let mut utmpentries_with_postion: Vec<(u32,UtmpEntry)> = Vec::new();
+        let mut utmpentries_with_postion: VecDeque<(u32,UtmpEntry)> = VecDeque::new();
+        let mut utmp_data_with_remove_marks: Vec<(bool, Vec<u8>)> = Vec::new();    // bool用于标注每个utmp数据段是否保留。
+        for (index, (original_data, utmp_item)) in utmp_items_with_original_data.into_iter().enumerate() {
+
             match UtmpEntry::try_from(utmp_item) {
                 Ok(utmp_entry) => {
                     match &cli.condition {
-                        Some(condition_vec) => if utmpentries.len() < cli.count as usize
-                            && (((&utmp_entry).pid != None && condition_vec.contains(&utmp_entry.pid.unwrap_or(0).to_string()))
+                        Some(condition_vec) => if ((&utmp_entry).pid != None && condition_vec.contains(&utmp_entry.pid.unwrap_or(0).to_string()))
                             || ((&utmp_entry).hostname != None && condition_vec.contains(&utmp_entry.hostname.clone().unwrap_or(String::new())))
                             || ((&utmp_entry).unioncode.len() > 0 && condition_vec.contains(&utmp_entry.unioncode))
-                        ) {
+                        {
                             // match the conditions
-                            assert!(utmpentries.len() < cli.count as usize);
-                            // tracing::debug!("current utmpentries lenght: {}\tcurrent record: {}", utmpentries.len(), (&utmp_entry).unioncode);
-                            utmpentries.push(utmp_entry);
-                        } else if cli.delete {
-                            // 暂存数据，用于覆盖源文件。
-                            save_back_data.append(&mut utmp_item.as_bytes_vec());
-                        } else {
-                            continue;
+                            // utmpentries.push(utmp_entry);
+                            utmp_data_with_remove_marks.push((false, original_data));
+                            utmpentries_with_postion.push_front((index as u32, utmp_entry));
+
+                            // 数据条目超出限制后，pop旧条目，并修改原始数据数组的标记。
+                            if (utmpentries_with_postion.len() > cli.count as usize && cli.count != 0){
+                                let (original_position, _) = utmpentries_with_postion.pop_back().unwrap();
+                                utmp_data_with_remove_marks[original_position as usize] = (true, utmp_data_with_remove_marks[original_position as usize].1.clone());
+                            }
+                        } else{
+                            // 对于不满足条件的条目，直接记录。
+                            utmp_data_with_remove_marks.push((true, original_data));
                         },
                         None => {
-                            if utmpentries.len() < cli.count as usize {
-                                utmpentries.push(utmp_entry);
-                            } else if cli.delete {
-                                save_back_data.append(&mut utmp_item.as_bytes_vec());
-                            } else {
-                                continue;
+                            if (utmpentries_with_postion.len() < cli.count as usize || cli.count == 0) {
+                                utmp_data_with_remove_marks.push((false, original_data));
+                                utmpentries_with_postion.push_front((index as u32, utmp_entry));
+                            } else{
+                                utmp_data_with_remove_marks.push((false, original_data));
+                                utmpentries_with_postion.push_front((index as u32, utmp_entry));
+
+                                let (original_position, _) = utmpentries_with_postion.pop_back().unwrap();
+                                utmp_data_with_remove_marks[original_position as usize] = (true, utmp_data_with_remove_marks[original_position as usize].1.clone());
+
                             }
                         }
                         _ => {}
                     };
+                    // println!("{:?}", utmpentries_with_postion.iter().map(|s|s.1.time).collect::<Vec<Option<NaiveDateTime>>>());
                 }
                 Err(e) => {
                     tracing::error!("it sames not well-format utmp data.");
@@ -142,10 +161,11 @@ fn main() {
             }
         }
 
-        if utmpentries.len() > 0 {
-            println!("\n{}\n", Table::builder(utmpentries)
+        if utmpentries_with_postion.len() > 0 {
+            // utmpentries_with_postion.reverse();
+            println!("\n{}\n", Table::builder(utmpentries_with_postion.into_iter().map(|t|t.1).collect::<Vec<_>>())
                 .index()
-                // .set_name(Some("INDEX".to_string()))
+                // .set_name(Some("INDEX".to_string())).clone()
                 .build()
                 // .with(Modify::new(Rows::single(0)).with(Padding::new(0, 0, 1, 1).set_fill('>', '<', '^', 'V')))
                 .with(Modify::new(Rows::single(0)).with(Alignment::center()))
@@ -164,7 +184,24 @@ fn main() {
                             // println!("override the original file.....");
                             // do override.....
                             // match write_to_file(target_file, save_back_data) {
-                            match fs::write(target_file, save_back_data) {
+                            // match fs::write(target_file, save_back_data) {
+                            //     Ok(_) => println!("Done."),
+                            //     Err(e) => tracing::error!("Something Wrong. | {}",e.to_string()),
+                            // }
+                            // for (true_mark, utmp_data) in utmp_data_with_remove_marks {
+                            //     if true_mark {
+                            //         match fs::write(&target_file, utmp_data) {
+                            //             Ok(_) => println!("Done."),
+                            //             Err(e) => tracing::error!("Something Wrong. | {}",e.to_string()),
+                            //         }
+                            //     }
+                            // }
+                            // utmp_data_with_remove_marks.into_iter().map(|(mark, data)| if mark {data} else {Vec::new()}).flatten().collect::<Vec<_>>();
+                            match fs::write(&target_file,
+                                            utmp_data_with_remove_marks.into_iter().
+                                                map(|(mark, data)| if mark { data } else { Vec::new() }).flatten()
+                                                .collect::<Vec<_>>(),
+                            ) {
                                 Ok(_) => println!("Done."),
                                 Err(e) => tracing::error!("Something Wrong. | {}",e.to_string()),
                             }

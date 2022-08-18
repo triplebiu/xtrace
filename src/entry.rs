@@ -40,7 +40,7 @@ pub struct UtmpEntry {
     sessionid: Option<i32>,
     #[tabled(display_with = "display_option")]
     #[tabled(rename = "Time")]
-    time: Option<NaiveDateTime>,
+    pub time: Option<NaiveDateTime>,
     #[tabled(display_with = "display_option")]
     #[tabled(rename = "IP Addr")]
     ipaddr: Option<IpAddr>,
@@ -65,10 +65,11 @@ pub enum UtmpError {
     ErrDuringEntryParse(String),
 }
 
-impl<'a> TryFrom<&'a Utmp> for UtmpEntry {
+// impl<'a> TryFrom<&'a Utmp> for UtmpEntry {
+impl TryFrom<Utmp> for UtmpEntry {
     type Error = UtmpError;
 
-    fn try_from(from: &Utmp) -> Result<Self, UtmpError> {
+    fn try_from(from: Utmp) -> Result<Self, UtmpError> {
         const ENTRY_TYPES: [&str; 12] = [
             "EMPTY",
             "RUN_LVL",
@@ -142,7 +143,6 @@ impl<'a> TryFrom<&'a Utmp> for UtmpEntry {
         Ok(tmpentry)
     }
 }
-
 
 #[test]
 fn test_base62() {
