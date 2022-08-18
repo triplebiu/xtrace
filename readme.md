@@ -15,20 +15,47 @@ A tool to clean up traces of operations on linux.
 
 ## 设计细节
 ### 命令行参数
-xtrace 默认命令：列出当前运行环境信息以及各项记录文件的最近10条记录
+
 ```bash
-  -A	Auto clear mode, default: false.
-  -M	Modify source file (require -d parameter),  default: false.
-  -c int
-    	Specified the record count to list/delete. default: 5 (print all)
-  -s string
-    	Conditions(pid/IP). multiple value can separated by commas.
-  -f string
-    	File path, multiple files can separated by commas, default: auto search utmp/wtmp/btmp files
+xtrace 0.1.0
+
+USAGE:
+    xtrace [OPTIONS]
+
+OPTIONS:
+    -c <number>
+            Specify the record count to aim in the target file [default: 5]
+
+    -D
+            DELETE the matched records in the target file(s)
+
+    -h, --help
+            Print help information
+
+    -s <Pid | Hostname | UnionCode>
+            search the condition to filter the records
+
+    -t <file>
+            Specify the target file [default: /run/utmp /var/log/wtmp /var/log/btmp]
+
+    -V, --version
+            Print version information
 ```
 
+### 常用命令
+```bash
+./xtrace -t /var/run/utmp -c 3 -D
+./xtrace -s 127.0.0.1 -D
+```
 
+## bug
+- 记录显示的顺序倒序了。。。
+- IP Addr的解析存在异常，不确定是否为大小端问题所致。。。。
 
+## TODO
+当前只能对Linux系统的utmp/wtmp/btmp记录进行罗列及删除操作。。。
+
+后续看情况。。。。
 
 ## 参考
 ### Linux日志文件

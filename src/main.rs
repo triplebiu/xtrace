@@ -7,6 +7,7 @@ use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use tracing_subscriber::{prelude::*, layer::SubscriberExt, util::SubscriberInitExt};
 use clap::{Args, Parser, Subcommand};
+use tracing_subscriber::filter::LevelFilter;
 use utmp;
 use utmp::UT_RECORDSIZE;
 use crate::entry::UtmpEntry;
@@ -22,9 +23,9 @@ struct Cli {
     PathBuf::from("/run/utmp"),
     PathBuf::from("/var/log/wtmp"),
     PathBuf::from("/var/log/btmp"),
-    PathBuf::from("files4test/utmp"),
-    PathBuf::from("files4test/wtmp"),
-    PathBuf::from("files4test/btmp"),
+    // PathBuf::from("files4test/utmp"),
+    // PathBuf::from("files4test/wtmp"),
+    // PathBuf::from("files4test/btmp"),
     ]
     )]
     targetfile: Vec<PathBuf>,
@@ -32,7 +33,7 @@ struct Cli {
     /// search the condition to filter the records.
     ///
     /// UnionCode is the base62 of timestamps, it can consider as unique.
-    #[clap(short = 's', value_name = "pid | Hostname | UnionCode")]
+    #[clap(short = 's', value_name = "Pid | Hostname | UnionCode")]
     condition: Option<Vec<String>>,
 
     /// Specify the record count to aim in the target file.
@@ -41,7 +42,7 @@ struct Cli {
 
     /// DELETE the matched records in the target file(s).
     ///
-    /// if the flag is false, it will just print out the records match the conditions.
+    /// if the flag does set, it will just print out the records match the conditions.
     #[clap(short = 'D', action)]
     delete: bool,
 }
@@ -50,11 +51,16 @@ struct Cli {
 fn main() {
     tracing_subscriber::registry()
         // .with(tracing_subscriber::EnvFilter::new(
-        //     std::env::var("RUST_LOG").unwrap_or_else(|_| "XTRACE_LOG=debug".into()),
+        //     std::env::var("XTRACE_LOG").unwrap_or_else(|_| "XTRACE_LOG=warn".into()),
         // ))
-        .with(tracing_subscriber::fmt::layer())
+        .with(tracing_subscriber::fmt::layer().with_filter(LevelFilter::WARN))
         .init();
 
+    // tracing::error!("tracing::error test");
+    // tracing::warn!("tracing::warn test");
+    // tracing::info!("tracing::info test");
+    // tracing::debug!("tracing::debug test");
+    // tracing::trace!("tracing::trace test");
     tracing::debug!("Command args: {:?}",std::env::args_os());
     let cli: Cli = Cli::parse();
     tracing::debug!("Parsed command args: {:#?}",cli);
@@ -69,7 +75,7 @@ fn main() {
         tracing::error!("The target file(s) no exists.   Quiting!");
         return;
     }
-    tracing::info!("exists files: {:?}",existsfile);
+    println!("Target Files: {:?}\nFilter Conditions: {:?}\nMax Count: {}",existsfile,&cli.condition.clone().unwrap_or(Vec::new()), cli.count);
 
     // 遍历目标文件
     for target_file in existsfile {
@@ -155,11 +161,11 @@ fn main() {
                     match line {
                         Err(_) => break,    // with ^Z
                         Ok(s) => if s.to_lowercase().trim_end().eq("yes") || s.to_lowercase().trim_end().eq("y") {
-                            println!("override the original file.....");
+                            // println!("override the original file.....");
                             // do override.....
                             // match write_to_file(target_file, save_back_data) {
                             match fs::write(target_file, save_back_data) {
-                                Ok(_) => println!("Override Successful."),
+                                Ok(_) => println!("Done."),
                                 Err(e) => tracing::error!("Something Wrong. | {}",e.to_string()),
                             }
                             break;
